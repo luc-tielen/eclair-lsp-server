@@ -5,7 +5,8 @@
   "description": "LSP server for Eclair",
   "main": "src/index.ts",
   "scripts": {
-    "build": "tsc src/ --outDir dist/",
+    "start": "npm run build && node ./dist/index.js",
+    "build": "tsc -p tsconfig.json",
     "lint": "eslint src/",
     "prettier": "prettier --write src/",
     "prettier-check": "prettier --check src/"
@@ -23,7 +24,10 @@
   "bugs": {
     "url": "https://github.com/luc-tielen/eclair-lsp-server/issues"
   },
-  "homepage": "https://github.com/luc-tielen/eclair-lsp-server#readme",
+  "homepage": "https://github.com/luc-tielen/eclair-lsp-server#README.md",
+  "dependencies": {
+    "vscode-languageserver": "^8.1.0"
+  },
   "devDependencies": {
     "@types/node": "^20.5.6",
     "@typescript-eslint/eslint-plugin": "^6.4.1",
