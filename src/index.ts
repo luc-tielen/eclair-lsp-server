@@ -15,26 +15,30 @@ import {
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 
-const delay = (delayMs: number) =>
-  new Promise((resolve) => setTimeout(resolve, delayMs));
-
 type ProcessCallbacks = {
-  onLine: (line: string) => void;
   onClose: (code: number | null) => void;
   onError: (err: Error) => void;
 };
 
-const runSubProcess = (
+const runSubProcessWithCallbacks = (
   command: string,
-  { onLine, onClose, onError }: ProcessCallbacks
+  { onClose, onError }: ProcessCallbacks
 ) => {
   const [cmd, ...args] = command.split(" ");
 
   const program = spawn(cmd, args, { stdio: "pipe" });
   const itf = createInterface(program.stdout);
 
+  const resolvers: ((line: string) => void)[] = [];
+
   const write = (data: string) => {
+    let resolver = (_line: string) => { };
+    const promise = new Promise((resolve) => (resolver = resolve));
+    resolvers.push(resolver);
+    console.log("push");
+
     program.stdin.write(data + "\n");
+    return promise;
   };
 
   const shutdown = () => {
@@ -45,7 +49,18 @@ const runSubProcess = (
 
   program.stdout.setEncoding("utf8");
 
-  itf.on("line", onLine);
+  // NOTE: right now this assumes every line written to the subprocess
+  // returns also only 1 line
+  itf.on("line", (line) => {
+    const resolver = resolvers.shift();
+    if (!resolver) {
+      console.error("Received unexpected response:", line);
+      shutdown();
+      return;
+    }
+
+    resolver(line); // Resolve the corresponding promise
+  });
 
   program.on("close", (code) => {
     itf.close();
@@ -53,33 +68,54 @@ const runSubProcess = (
   });
 
   program.on("error", (err) => {
-    itf.close();
-    program.kill();
+    shutdown();
     onError(err);
   });
 
   return { write, shutdown };
 };
 
-const main = async () => {
-  const { write, shutdown } = runSubProcess("node echo.js", {
-    onLine: (line) => console.log("line", line),
-    onClose: (code) => console.log("echo.js exited with code:", code),
-    onError: (err) => {
-      console.error("echo.js failed with error:");
-      console.error(err);
-    },
+const runSubProcess = (command: string) => {
+  let resolveFn = (_code: number | null) => { };
+  let rejectFn = (_err: Error) => { };
+  const promise = new Promise((resolve, reject) => {
+    resolveFn = resolve;
+    rejectFn = reject;
   });
 
-  write("works?");
-  write("works?");
-  write("works?");
-  write("works?");
-  write("works?");
-  write("works?");
+  const { write, shutdown } = runSubProcessWithCallbacks(command, {
+    onClose: resolveFn,
+    onError: rejectFn,
+  });
 
-  await delay(1000);
-  shutdown();
+  return {
+    then: async (resolve: (code: number | null) => void) => {
+      const code = (await promise) as number | null;
+      resolve(code);
+    },
+    write,
+    shutdown,
+  };
+};
+
+const main = async () => {
+  try {
+    const echo = runSubProcess("node echo.js");
+
+    const line = await echo.write("works?");
+    console.log(line);
+    const line2 = await echo.write("works?");
+    console.log(line2);
+
+    echo.shutdown();
+
+    const code = await echo;
+    console.log("echo.js exited with code:", code);
+  } catch (err) {
+    console.error("echo.js failed with error:");
+    console.error(err);
+  }
+
   // console.log("hello eclair lsp");
   // const connection = createConnection(ProposedFeatures.all);
   // connection.onHover(TODO)
