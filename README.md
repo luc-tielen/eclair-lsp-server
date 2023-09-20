@@ -17,6 +17,10 @@ Eclair.
   npm start
   ```
 
+## Running the tests
+
+Use `npm run test` to run the testsuite.
+
 ## TODO
 
 - CI
@@ -38,8 +42,4 @@ Eclair.
   - didOpenTextDocumentNotificationHandler (diagnostics: errors)
   - didChangeTextDocumentNotificationHandler (diagnostics)
   - didSaveTextDocumentNotificationHandler (diagnostics)
-- change code in eclair itself:
-  - main: needs to be turned into a loop that receives JSON, parses it, runs the
-    corresponding command, and transforms results back into JSON, and sends it
-    back to the server
 - add tests (with dummy "eclair" process that can send back any JSON)
