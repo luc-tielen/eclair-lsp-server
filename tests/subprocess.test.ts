@@ -34,12 +34,10 @@ describe("runSubprocess", () => {
   });
 
   it("throws if program not found", async () => {
-    const program = runSubProcess("./tests/fixtures/not_found.sh");
     try {
-      await program;
-      // assert(false);
+      await runSubProcess("./tests/fixtures/not_found.sh");
     } catch (err) {
-      expect((err as Error).message).toContain("ENOENT");
+      expect((err as Error).message).toContain("Executable not found");
     }
   });
 });
