@@ -21,7 +21,6 @@ const runSubProcessWithCallbacks = (
     let resolver = (_line: string) => { };
     const promise = new Promise((resolve) => (resolver = resolve));
     resolvers.push(resolver);
-    console.log("push");
 
     program.stdin.write(data + "\n");
     return promise;
@@ -75,9 +74,13 @@ const runSubProcess = (command: string) => {
   });
 
   return {
-    then: async (resolve: (code: number | null) => void) => {
-      const code = (await promise) as number | null;
-      resolve(code);
+    then: async (
+      resolve: (code: number | null) => void,
+      reject: (err: Error) => void
+    ) => {
+      await promise
+        .then((code) => resolve(code as number | null))
+        .catch(reject);
     },
     write,
     shutdown,
