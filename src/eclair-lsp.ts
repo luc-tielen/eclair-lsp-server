@@ -22,17 +22,25 @@ type DiagnosticSource =
   | "SemanticAnalysis"
   | "Transpiler";
 
-type Command<T extends string, C> = {
-  type: T;
-  command: C;
+type CommandType =
+  | "update-vfs"
+  | "hover"
+  | "document-highlight"
+  | "diagnostics";
+
+type Result<K extends Exclude<CommandType, "update-vfs">, A, B> =
+  | ({ type: "success" } & { [key in K]: A })
+  | { type: "error"; error: B };
+
+type UpdateVFSCommand = {
+  file: string;
+  contents: string;
 };
 
-type UpdateVFSCommand = Command<
-  "update-vfs",
-  { file: string; contents: string }
->;
-
-type HoverCommand = Command<"hover", { file: string; position: Position }>;
+type HoverCommand = {
+  file: string;
+  position: Position;
+};
 
 type HoverResponse = {
   location: SourceSpan;
@@ -42,17 +50,19 @@ type HoverResponse = {
 type ErrorResponse = {
   file: string;
   position: Position;
-  error: string;
+  message: string;
 };
 
-type DocumentHighlightCommand = Command<
-  "document-highlight",
-  { file: string; position: Position }
->;
+type DocumentHighlightCommand = {
+  file: string;
+  position: Position;
+};
 
 type DocumentHighlightResponse = SourceSpan[];
 
-type DiagnosticsCommand = Command<"diagnostics", { file: string }>;
+type DiagnosticsCommand = {
+  file: string;
+};
 
 type DiagnosticInfo = {
   location: SourceSpan;
@@ -67,7 +77,27 @@ type SuccessResponse = {
   success: true;
 };
 
-const eclairLsp = () => {
+type Handler<Command, Response> = (cmd: Command) => Promise<Response>;
+
+export type EclairLsp = {
+  updateVFS: Handler<UpdateVFSCommand, SuccessResponse>;
+  hover: Handler<HoverCommand, Result<"hover", HoverResponse, ErrorResponse>>;
+  documentHighlight: Handler<
+    DocumentHighlightCommand,
+    Result<"document-highlight", DocumentHighlightResponse, ErrorResponse>
+  >;
+  diagnostics: Handler<
+    DiagnosticsCommand,
+    Result<"diagnostics", DiagnosticsResponse, ErrorResponse>
+  >;
+  shutdown: () => Promise<void>;
+  then: (
+    resolve: (code: number | null) => void,
+    reject: (err: Error) => void
+  ) => Promise<void>;
+};
+
+const eclairLsp = (): EclairLsp => {
   // TODO env vars (temporarily)
   const eclair = runSubProcess("eclair lsp");
 
@@ -76,18 +106,30 @@ const eclairLsp = () => {
     return JSON.parse(response as string) as T;
   };
 
+  const writeCommand = <T>(type: CommandType, command: object) =>
+    write<T>({ type, command });
+
   const shutdown = async () => {
     await write({ type: "shutdown" });
     eclair.shutdown();
   };
 
-  const updateVFS = (msg: UpdateVFSCommand) => write<SuccessResponse>(msg);
-  const hover = (msg: HoverCommand) =>
-    write<HoverResponse | ErrorResponse>(msg);
-  const documentHighlight = (msg: DocumentHighlightCommand) =>
-    write<DocumentHighlightResponse | ErrorResponse>(msg);
-  const diagnostics = (msg: DiagnosticsCommand) =>
-    write<DiagnosticsResponse | ErrorResponse>(msg);
+  const updateVFS = (command: UpdateVFSCommand) =>
+    writeCommand<SuccessResponse>("update-vfs", command);
+  const hover = (command: HoverCommand) =>
+    writeCommand<Result<"hover", HoverResponse, ErrorResponse>>(
+      "hover",
+      command
+    );
+  const documentHighlight = (command: DocumentHighlightCommand) =>
+    writeCommand<
+      Result<"document-highlight", DocumentHighlightResponse, ErrorResponse>
+    >("document-highlight", command);
+  const diagnostics = (command: DiagnosticsCommand) =>
+    writeCommand<Result<"diagnostics", DiagnosticsResponse, ErrorResponse>>(
+      "diagnostics",
+      command
+    );
 
   return {
     then: eclair.then,
