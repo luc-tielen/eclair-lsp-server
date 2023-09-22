@@ -1,8 +1,5 @@
 run:
-	bun run ./src/index.ts
-
-build:
-	bun build ./src/index.ts
+	bun run ./src/index.ts --stdio
 
 test:
 	bun test
@@ -11,6 +8,7 @@ install:
 	bun i
 
 clean:
-	rm -rf node_modules
+	rm -rf dist/
+	rm -rf node_modules/
 
-.PHONY: run build test install clean
+.PHONY: run test install clean
