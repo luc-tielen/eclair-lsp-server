@@ -26,7 +26,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import eclairLsp, { EclairLsp } from "./eclair-lsp.js";
 import assert from "assert";
 
-const setupVFS = (eclair: EclairLsp) => {
+const setupVFS = (conn: Connection, eclair: EclairLsp) => {
   const vfs = new TextDocuments(TextDocument);
   const updateVFS = async (event: TextDocumentChangeEvent<TextDocument>) => {
     // TODO add debouncing if handler becomes too slow?
@@ -36,9 +36,46 @@ const setupVFS = (eclair: EclairLsp) => {
     const response = await eclair.updateVFS(msg);
     assert(response.success);
   };
-  vfs.onDidOpen(updateVFS);
-  vfs.onDidSave(updateVFS);
-  vfs.onDidChangeContent(updateVFS);
+
+  const updateDiagnostics = async (
+    event: TextDocumentChangeEvent<TextDocument>
+  ) => {
+    const file = event.document.uri;
+    const response = await eclair.diagnostics({ file });
+    if (response.type === "error") {
+      // TODO does this work? or do we also send a single error diagnostic here?
+      return new ResponseError(
+        ErrorCodes.InternalError,
+        response.error.message
+      );
+    }
+
+    const diagnostics: Diagnostic[] = response.diagnostics.map((d) => {
+      const { start, end } = d.location;
+      return {
+        message: d.message,
+        range: {
+          start: { line: start.line, character: start.column },
+          end: { line: end.line, character: end.column },
+        },
+        severity:
+          d.severity === "error"
+            ? DiagnosticSeverity.Error
+            : DiagnosticSeverity.Information,
+        source: d.source,
+      };
+    });
+    await conn.sendDiagnostics({ uri: file, diagnostics });
+  };
+
+  const handler = async (event: TextDocumentChangeEvent<TextDocument>) => {
+    await updateVFS(event);
+    await updateDiagnostics(event);
+  };
+
+  vfs.onDidOpen(handler);
+  vfs.onDidSave(handler);
+  vfs.onDidChangeContent(handler);
   return vfs;
 };
 
@@ -104,48 +141,10 @@ type DiagnosticParams = {
   textDocument: { uri: string };
 };
 
-const setupDiagnostics = (conn: Connection, eclair: EclairLsp) => {
-  const publishDiagnostics = async (
-    params: DiagnosticParams
-  ): Promise<void | ResponseError> => {
-    const file = params.textDocument.uri;
-    const response = await eclair.diagnostics({ file });
-    if (response.type === "error") {
-      // TODO does this work? or do we also send a single error diagnostic here?
-      return new ResponseError(
-        ErrorCodes.InternalError,
-        response.error.message
-      );
-    }
-
-    const diagnostics: Diagnostic[] = response.diagnostics.map((d) => {
-      const { start, end } = d.location;
-      return {
-        message: d.message,
-        range: {
-          start: { line: start.line, character: start.column },
-          end: { line: end.line, character: end.column },
-        },
-        severity:
-          d.severity === "error"
-            ? DiagnosticSeverity.Error
-            : DiagnosticSeverity.Information,
-        source: d.source,
-      };
-    });
-    conn.sendDiagnostics({ uri: file, diagnostics });
-  };
-
-  conn.onDidOpenTextDocument(publishDiagnostics);
-  conn.onDidChangeTextDocument(publishDiagnostics);
-  conn.onDidSaveTextDocument(publishDiagnostics);
-};
-
 const setupHandlers = (conn: Connection, eclair: EclairLsp) => {
-  const vfs = setupVFS(eclair);
+  const vfs = setupVFS(conn, eclair);
   setupHover(conn, eclair);
   setupDocumentHighlight(conn, eclair);
-  setupDiagnostics(conn, eclair);
   return vfs;
 };
 
@@ -170,7 +169,7 @@ const setupInitialization = (conn: Connection) => {
       diagnosticProvider: {
         identifier: "eclair",
         interFileDependencies: true,
-        workspaceDiagnostics: true,
+        workspaceDiagnostics: false,
       },
       // TODO implement these at some later time
       typeDefinitionProvider: false,
