@@ -22,7 +22,7 @@
     "eclair-lsp": "dist/index.js"
   },
   "scripts": {
-    "start": "npm run build && node ./dist/index.js",
+    "start": "npm run build && node ./dist/index.js --stdio",
     "build": "tsc -p tsconfig.json",
     "test": "mocha --require tests/setup.js tests/*.test.ts",
     "lint": "eslint src/",
@@ -30,8 +30,8 @@
     "prettier-check": "prettier --check src/"
   },
   "dependencies": {
-    "vscode-languageserver": "6.1.1",
-    "vscode-languageserver-textdocument": "1.0.1"
+    "vscode-languageserver": "^9.0.0",
+    "vscode-languageserver-textdocument": "^1.0.8"
   },
   "devDependencies": {
     "@types/chai": "^4.3.6",

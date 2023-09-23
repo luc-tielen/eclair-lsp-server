@@ -9,17 +9,24 @@ import {
   HoverParams,
   Hover,
   TextDocumentChangeEvent,
-  IConnection,
+  Connection,
   ResponseError,
   ErrorCodes,
   DocumentHighlight,
   DocumentHighlightKind,
+  DidChangeTextDocumentNotification,
+  HoverRequest,
+  DocumentDiagnosticRequest,
+  WorkspaceDiagnosticRequest,
+  DocumentHighlightRequest,
+  DidOpenTextDocumentNotification,
+  PositionEncodingKind,
 } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import eclairLsp, { EclairLsp } from "./eclair-lsp.js";
 import assert from "assert";
 
-const setupVFS = (conn: IConnection, eclair: EclairLsp) => {
+const setupVFS = (eclair: EclairLsp) => {
   const vfs = new TextDocuments(TextDocument);
   const updateVFS = async (event: TextDocumentChangeEvent<TextDocument>) => {
     // TODO add debouncing if handler becomes too slow?
@@ -30,11 +37,12 @@ const setupVFS = (conn: IConnection, eclair: EclairLsp) => {
     assert(response.success);
   };
   vfs.onDidOpen(updateVFS);
+  vfs.onDidSave(updateVFS);
   vfs.onDidChangeContent(updateVFS);
-  vfs.listen(conn);
+  return vfs;
 };
 
-const setupHover = (conn: IConnection, eclair: EclairLsp) =>
+const setupHover = (conn: Connection, eclair: EclairLsp) =>
   conn.onHover(async (params: HoverParams): Promise<Hover | ResponseError> => {
     const file = params.textDocument.uri;
     const { line, character: column } = params.position;
@@ -43,6 +51,7 @@ const setupHover = (conn: IConnection, eclair: EclairLsp) =>
       position: { line, column },
     };
     const response = await eclair.hover(msg);
+
     if (response.type === "error") {
       return new ResponseError(
         ErrorCodes.InvalidParams,
@@ -60,7 +69,7 @@ const setupHover = (conn: IConnection, eclair: EclairLsp) =>
     };
   });
 
-const setupDocumentHighlight = (conn: IConnection, eclair: EclairLsp) =>
+const setupDocumentHighlight = (conn: Connection, eclair: EclairLsp) =>
   conn.onDocumentHighlight(
     async (
       params: DocumentHighlightParams
@@ -78,14 +87,14 @@ const setupDocumentHighlight = (conn: IConnection, eclair: EclairLsp) =>
           response.error.message
         );
       }
-      return response["document-highlight"].map((highlight) => {
+      return response.highlights.map((highlight) => {
         const { start, end } = highlight;
         return {
           range: {
             start: { line: start.line, character: start.column },
             end: { line: end.line, character: end.column },
           },
-          kind: DocumentHighlightKind.Read,
+          kind: DocumentHighlightKind.Text,
         };
       });
     }
@@ -95,7 +104,7 @@ type DiagnosticParams = {
   textDocument: { uri: string };
 };
 
-const setupDiagnostics = (conn: IConnection, eclair: EclairLsp) => {
+const setupDiagnostics = (conn: Connection, eclair: EclairLsp) => {
   const publishDiagnostics = async (
     params: DiagnosticParams
   ): Promise<void | ResponseError> => {
@@ -132,30 +141,65 @@ const setupDiagnostics = (conn: IConnection, eclair: EclairLsp) => {
   conn.onDidSaveTextDocument(publishDiagnostics);
 };
 
-const setupHandlers = (conn: IConnection, eclair: EclairLsp) => {
-  setupVFS(conn, eclair);
+const setupHandlers = (conn: Connection, eclair: EclairLsp) => {
+  const vfs = setupVFS(eclair);
   setupHover(conn, eclair);
   setupDocumentHighlight(conn, eclair);
   setupDiagnostics(conn, eclair);
+  return vfs;
 };
 
-const setupInitialization = (conn: IConnection) =>
+const setupInitialization = (conn: Connection) => {
   conn.onInitialize((_params: InitializeParams) => ({
     capabilities: {
-      textDocumentSync: TextDocumentSyncKind.Full,
+      positionEncoding: PositionEncodingKind.UTF8,
+      workspace: {
+        // do we need this?
+        workspaceFolders: {
+          changeNotifications: true,
+          supported: true,
+        },
+      },
+      textDocumentSync: {
+        openClose: true,
+        change: TextDocumentSyncKind.Full,
+      },
+      hoverProvider: true,
+      documentHighlightProvider: true,
+      referencesProvider: true,
+      diagnosticProvider: {
+        identifier: "eclair",
+        interFileDependencies: true,
+        workspaceDiagnostics: true,
+      },
+      // TODO implement these at some later time
+      typeDefinitionProvider: false,
+      definitionProvider: false,
       completionProvider: {
         resolveProvider: false,
       },
+      documentFormattingProvider: false,
+      codeActionProvider: false,
     },
   }));
+  conn.onInitialized(() => {
+    conn.client.register(DidOpenTextDocumentNotification.type);
+    conn.client.register(DidChangeTextDocumentNotification.type);
+    conn.client.register(HoverRequest.type);
+    conn.client.register(DocumentHighlightRequest.type);
+    conn.client.register(DocumentDiagnosticRequest.type);
+    conn.client.register(WorkspaceDiagnosticRequest.type);
+  });
+};
 
 const setupLsp = () => {
   const eclair = eclairLsp();
-  const conn = createConnection();
-  setupHandlers(conn, eclair);
+  const conn: Connection = (createConnection as any)(); // vscode types suck.
+  const vfs = setupHandlers(conn, eclair);
   setupInitialization(conn);
 
-  return conn;
+  vfs.listen(conn);
+  return { eclair, conn };
 };
 
 export default setupLsp;

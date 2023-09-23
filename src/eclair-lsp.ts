@@ -28,7 +28,9 @@ type CommandType =
   | "document-highlight"
   | "diagnostics";
 
-type Result<K extends Exclude<CommandType, "update-vfs">, A, B> =
+type ResultTag = "hover" | "highlights" | "diagnostics";
+
+type Result<K extends ResultTag, A, B> =
   | ({ type: "success" } & { [key in K]: A })
   | { type: "error"; error: B };
 
@@ -84,7 +86,7 @@ export type EclairLsp = {
   hover: Handler<HoverCommand, Result<"hover", HoverResponse, ErrorResponse>>;
   documentHighlight: Handler<
     DocumentHighlightCommand,
-    Result<"document-highlight", DocumentHighlightResponse, ErrorResponse>
+    Result<"highlights", DocumentHighlightResponse, ErrorResponse>
   >;
   diagnostics: Handler<
     DiagnosticsCommand,
@@ -125,14 +127,13 @@ export const _eclairLsp = (command: string = lspCommand): EclairLsp => {
     );
   const documentHighlight = (command: DocumentHighlightCommand) =>
     writeCommand<
-      Result<"document-highlight", DocumentHighlightResponse, ErrorResponse>
+      Result<"highlights", DocumentHighlightResponse, ErrorResponse>
     >("document-highlight", command);
   const diagnostics = (command: DiagnosticsCommand) =>
     writeCommand<Result<"diagnostics", DiagnosticsResponse, ErrorResponse>>(
       "diagnostics",
       command
     );
-
   return {
     then: eclair.then,
     shutdown,
