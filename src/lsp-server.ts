@@ -14,12 +14,9 @@ import {
   ErrorCodes,
   DocumentHighlight,
   DocumentHighlightKind,
-  DidChangeTextDocumentParams,
-  DidOpenTextDocumentParams,
-  DidSaveTextDocumentParams,
 } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import eclairLsp, { EclairLsp } from "./eclair-lsp";
+import eclairLsp, { EclairLsp } from "./eclair-lsp.js";
 import assert from "assert";
 
 const setupVFS = (conn: IConnection, eclair: EclairLsp) => {

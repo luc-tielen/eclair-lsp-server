@@ -1,4 +1,6 @@
-import setupLsp from "./lsp-server";
+#!/usr/bin/env node
+
+import setupLsp from "./lsp-server.js";
 
 const main = () => {
   const serverConnection = setupLsp();

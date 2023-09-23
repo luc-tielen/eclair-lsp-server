@@ -18,6 +18,9 @@
   ],
   "type": "module",
   "main": "src/index.ts",
+  "bin": {
+    "eclair-lsp": "dist/index.js"
+  },
   "scripts": {
     "start": "npm run build && node ./dist/index.js",
     "build": "tsc -p tsconfig.json",
