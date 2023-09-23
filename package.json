@@ -21,7 +21,7 @@
   "scripts": {
     "start": "npm run build && node ./dist/index.js",
     "build": "tsc -p tsconfig.json",
-    "test": "mocha --require tests/setup.js tests/*.test.ts 2>/dev/null",
+    "test": "mocha --require tests/setup.js tests/*.test.ts",
     "lint": "eslint src/",
     "prettier": "prettier --write src/",
     "prettier-check": "prettier --check src/"
@@ -42,7 +42,6 @@
     "eslint-config-prettier": "^9.0.0",
     "mocha": "^10.2.0",
     "prettier": "^3.0.2",
-    "rewire": "^7.0.0",
     "sinon": "^16.0.0",
     "sinon-chai": "^3.7.0",
     "ts-node": "^10.9.1",

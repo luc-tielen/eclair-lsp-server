@@ -97,9 +97,12 @@ export type EclairLsp = {
   ) => Promise<void>;
 };
 
-const eclairLsp = (): EclairLsp => {
+const lspCommand = "eclair lsp";
+
+// Argument only used during testing
+export const _eclairLsp = (command: string = lspCommand): EclairLsp => {
   // TODO env vars (temporarily)
-  const eclair = runSubProcess("eclair lsp");
+  const eclair = runSubProcess(command);
 
   const write = async <T>(msg: object) => {
     const response = await eclair.write(JSON.stringify(msg));
@@ -140,5 +143,7 @@ const eclairLsp = (): EclairLsp => {
     diagnostics,
   };
 };
+
+const eclairLsp = () => _eclairLsp();
 
 export default eclairLsp;
