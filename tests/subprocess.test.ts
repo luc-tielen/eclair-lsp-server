@@ -1,3 +1,4 @@
+import { expect } from "chai";
 import runSubProcess from "../src/subprocess";
 
 describe("runSubprocess", () => {
@@ -8,12 +9,12 @@ describe("runSubprocess", () => {
     const msg2 = "another message";
     const line = await program.write(msg1);
     const line2 = await program.write(msg2);
-    expect(line).toBe(msg1);
-    expect(line2).toBe(msg2);
+    expect(line).to.eql(msg1);
+    expect(line2).to.eql(msg2);
 
     program.shutdown();
     const code = await program;
-    expect(code).toBe(null); // null because it was shutdown
+    expect(code).to.eql(null); // null because it was shutdown
   });
 
   it("can wait for the program to run until completion", async () => {
@@ -21,23 +22,23 @@ describe("runSubprocess", () => {
 
     const msg1 = "test 123";
     const line = await program.write(msg1);
-    expect(line).toBe(msg1);
+    expect(line).to.eql(msg1);
 
     const code = await program;
-    expect(code).toBe(0);
+    expect(code).to.eql(0);
   });
 
   it("resolves if program returns non-zero exit code", async () => {
     const program = runSubProcess("./tests/fixtures/always_fails.sh");
     const code = await program;
-    expect(code).toBe(1);
+    expect(code).to.eql(1);
   });
 
   it("throws if program not found", async () => {
     try {
       await runSubProcess("./tests/fixtures/not_found.sh");
     } catch (err) {
-      expect((err as Error).message).toContain("Executable not found");
+      expect((err as Error).message).to.include("ENOENT");
     }
   });
 });
