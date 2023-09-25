@@ -137,10 +137,6 @@ const setupDocumentHighlight = (conn: Connection, eclair: EclairLsp) =>
     }
   );
 
-type DiagnosticParams = {
-  textDocument: { uri: string };
-};
-
 const setupHandlers = (conn: Connection, eclair: EclairLsp) => {
   const vfs = setupVFS(conn, eclair);
   setupHover(conn, eclair);
